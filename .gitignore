@@ -1,0 +1,24 @@
+# Node
+node_modules/
+dist/
+.env
+
+# Python
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# System
+.DS_Store
+Thumbs.db
+
+# Models
+*.pth
+*.h5
+*.onnx
+*.weights
+backend/models/
+
+# Database
+reports.db
