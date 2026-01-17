@@ -5,7 +5,7 @@ import {
     Filter, Search, CheckCircle, Clock,
     AlertTriangle, Eye, XCircle, Download,
     Send, FileText, TrendingUp, Users,
-    BarChart3, RefreshCw, Trash2, Activity, Shield
+    BarChart3, RefreshCw, Trash2, Activity, Shield, Image as ImageIcon
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -51,7 +51,6 @@ const GovDashboard = () => {
     const handleDispatch = (id) => {
         if (!dispatched.includes(id)) {
             setDispatched([...dispatched, id]);
-            // In a real app, this would update the status in DB
         }
     };
 
@@ -91,7 +90,7 @@ const GovDashboard = () => {
     };
 
     return (
-        <div className="min-h-screen pt-24 pb-12 px-6 bg-bg-dark text-white">
+        <div className="min-h-screen pt-24 pb-12 px-6 bg-[#020804] text-white">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
@@ -104,13 +103,15 @@ const GovDashboard = () => {
                         </h1>
                         <p className="text-muted text-xs font-medium uppercase tracking-[0.3em] mt-1">Autonomous Environmental Response Terminal</p>
                     </div>
-                    <button
-                        onClick={fetchReports}
-                        className="bg-white/5 hover:bg-white/10 border border-white/10 px-6 py-3 rounded-2xl flex items-center gap-3 transition-all group active:scale-95"
-                    >
-                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-primary' : 'text-muted group-hover:text-primary transition-colors'}`} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Update Data Feed</span>
-                    </button>
+                    <div className="flex gap-4">
+                        <button
+                            onClick={fetchReports}
+                            className="bg-white/5 hover:bg-white/10 border border-white/10 px-6 py-3 rounded-2xl flex items-center gap-3 transition-all group active:scale-95"
+                        >
+                            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-primary' : 'text-muted group-hover:text-primary transition-colors'}`} />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Update Feed</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Quick Stats Grid */}
@@ -180,9 +181,19 @@ const GovDashboard = () => {
                                     onClick={() => setSelectedReport(report)}
                                     className={`glass-panel p-6 cursor-pointer border transition-all hover:scale-[1.01] flex flex-col md:flex-row justify-between items-start md:items-center gap-6 ${selectedReport?.id === report.id ? 'border-primary/50 bg-primary/5' : 'border-white/5'} ${dispatched.includes(report.id) ? 'opacity-70' : ''}`}
                                 >
-                                    <div className="flex gap-6 items-center">
-                                        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 ${report.category === 'deforestation' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
-                                            {report.category === 'deforestation' ? <Leaf size={28} /> : <AlertTriangle size={28} />}
+                                    <div className="flex gap-6 items-center flex-1">
+                                        <div className="relative group/thumb">
+                                            {report.image_path ? (
+                                                <img
+                                                    src={report.image_path}
+                                                    alt="Evidence"
+                                                    className="w-16 h-16 rounded-2xl object-cover border border-white/10 group-hover/thumb:border-primary/50 transition-all"
+                                                />
+                                            ) : (
+                                                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 ${report.category === 'deforestation' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
+                                                    {report.category === 'deforestation' ? <Leaf size={28} /> : <AlertTriangle size={28} />}
+                                                </div>
+                                            )}
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-3 mb-2">
@@ -202,7 +213,7 @@ const GovDashboard = () => {
                                             <div className="flex flex-wrap items-center gap-6">
                                                 <div className="flex items-center gap-2 text-[10px] text-muted font-bold uppercase tracking-widest">
                                                     <MapPin size={12} className="text-primary" />
-                                                    {report.lat ? `${report.lat}, ${report.lng}` : 'Geotag Missing'}
+                                                    {report.lat ? `${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}` : 'Geotag Missing'}
                                                 </div>
                                                 <div className="flex items-center gap-2 text-[10px] text-muted font-bold uppercase tracking-widest">
                                                     <Clock size={12} className="text-primary" />
@@ -211,9 +222,9 @@ const GovDashboard = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="text-right w-full md:w-auto border-t md:border-t-0 border-white/5 pt-4 md:pt-0">
-                                        <div className="text-[10px] font-black text-muted uppercase tracking-widest mb-1">AI Confidence</div>
-                                        <div className="text-3xl font-black text-white">{Math.round((report.confidence || 0.95) * 100)}%</div>
+                                    <div className="text-right w-full md:w-auto border-t md:border-t-0 border-white/5 pt-4 md:pt-0 flex flex-col items-end">
+                                        <div className="text-[10px] font-black text-muted uppercase tracking-widest mb-1">Inference Match</div>
+                                        <div className="text-3xl font-black text-white">{Math.round(report.score * 100)}%</div>
                                     </div>
                                 </div>
                             ))}
@@ -251,17 +262,47 @@ const GovDashboard = () => {
                                         </div>
                                     </div>
 
+                                    {/* Vision Analytics Section */}
+                                    <div className="space-y-4">
+                                        <label className="text-[9px] font-black text-muted uppercase tracking-widest flex items-center gap-2">
+                                            <ImageIcon size={12} className="text-primary" /> Critical Evidence Vision
+                                        </label>
+                                        <div className="relative group overflow-hidden rounded-[2rem] border border-white/10 aspect-video bg-white/5">
+                                            {selectedReport.image_path ? (
+                                                <img
+                                                    src={selectedReport.image_path}
+                                                    alt="Report Vision"
+                                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full flex flex-col items-center justify-center text-muted">
+                                                    <ImageIcon size={48} className="opacity-20 mb-4" />
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest">No Visual Telemetry</span>
+                                                </div>
+                                            )}
+                                            <div className="absolute inset-0 bg-gradient-to-t from-bg-dark/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
+                                                <div className="bg-bg-dark/80 backdrop-blur px-3 py-1.5 rounded-lg border border-white/10 text-[8px] font-black uppercase tracking-widest">
+                                                    Sensors Active
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div className="space-y-6">
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
-                                                <label className="text-[9px] font-black text-muted uppercase tracking-widest">Inference Type</label>
+                                                <label className="text-[9px] font-black text-muted uppercase tracking-widest">Sector</label>
                                                 <div className="flex items-center gap-3 p-4 bg-white/5 rounded-2xl border border-white/10 uppercase font-bold text-[10px] text-primary transition-all">
                                                     {selectedReport.category === 'deforestation' ? <Leaf size={14} /> : <AlertTriangle size={14} />}
                                                     {selectedReport.category}
                                                 </div>
                                             </div>
                                             <div className="space-y-2">
-                                                <label className="text-[9px] font-black text-muted uppercase tracking-widest">Threat Index</label>
+                                                <label className="text-[9px] font-black text-muted uppercase tracking-widest">Threat Level</label>
                                                 <div className={`flex items-center gap-3 p-4 bg-white/5 rounded-2xl border border-white/10 uppercase font-black text-[10px] ${selectedReport.score > 0.4 ? 'text-danger' : 'text-success'}`}>
                                                     {Math.round(selectedReport.score * 100)}% Risk
                                                 </div>
@@ -269,7 +310,7 @@ const GovDashboard = () => {
                                         </div>
 
                                         <div className="space-y-2">
-                                            <label className="text-[9px] font-black text-muted uppercase tracking-widest">Tactical Status</label>
+                                            <label className="text-[9px] font-black text-muted uppercase tracking-widest">Operational Status</label>
                                             <div className={`flex items-center gap-3 p-4 rounded-2xl border italic text-[10px] font-bold transition-all ${dispatched.includes(selectedReport.id) ? 'bg-primary border-bg-dark text-bg-dark' : 'bg-white/5 border-white/10 text-white/50'}`}>
                                                 {dispatched.includes(selectedReport.id) ? (
                                                     <><CheckCircle size={16} /> RESPONSE UNIT DEPLOYED</>
@@ -280,7 +321,7 @@ const GovDashboard = () => {
                                         </div>
 
                                         <div className="space-y-4">
-                                            <label className="text-[9px] font-black text-muted uppercase tracking-widest">Response Protocols</label>
+                                            <label className="text-[9px] font-black text-muted uppercase tracking-widest">Neural Directives</label>
                                             <button
                                                 onClick={() => handleDispatch(selectedReport.id)}
                                                 disabled={dispatched.includes(selectedReport.id)}
@@ -291,7 +332,7 @@ const GovDashboard = () => {
 
                                             <div className="grid grid-cols-2 gap-4">
                                                 <button className="bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 py-4 rounded-2xl font-black uppercase text-[9px] tracking-widest transition-all flex items-center justify-center gap-2">
-                                                    <Download size={14} /> telemetry
+                                                    <Download size={14} /> Log Data
                                                 </button>
                                                 <button className="bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 py-4 rounded-2xl font-black uppercase text-[9px] tracking-widest transition-all flex items-center justify-center gap-2">
                                                     <FileText size={14} /> PDF Brief

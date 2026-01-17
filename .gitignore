@@ -22,3 +22,6 @@ backend/models/
 
 # Database
 reports.db
+
+# Uploads
+backend/uploads/

@@ -20,6 +20,8 @@ from typing import Optional
 # Robust Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "reports.db")
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads", "reports")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -32,19 +34,26 @@ def init_db():
         cursor.execute('''CREATE TABLE IF NOT EXISTS reports_new 
                          (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                           lat REAL, lng REAL, score REAL, 
-                          category TEXT, status TEXT, timestamp DATETIME)''')
+                          category TEXT, status TEXT, image_path TEXT, timestamp DATETIME)''')
         # If old table exists, migrate data
         if 'lat' in columns:
             cursor.execute("INSERT INTO reports_new (lat, lng, score, status, timestamp) SELECT lat, lng, score, status, timestamp FROM reports")
             cursor.execute("DROP TABLE reports")
         cursor.execute("ALTER TABLE reports_new RENAME TO reports")
-        # Set default category for old data
+        # Set default values for old data
         cursor.execute("UPDATE reports SET category = 'landfill' WHERE category IS NULL")
     
+    # Check for image_path specifically if category already existed
+    if 'image_path' not in columns:
+        try:
+            cursor.execute("ALTER TABLE reports ADD COLUMN image_path TEXT")
+        except sqlite3.OperationalError:
+            pass # Column already exists
+            
     cursor.execute('''CREATE TABLE IF NOT EXISTS reports 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                       lat REAL, lng REAL, score REAL, 
-                      category TEXT, status TEXT, timestamp DATETIME)''')
+                      category TEXT, status TEXT, image_path TEXT, timestamp DATETIME)''')
     conn.commit()
     conn.close()
 
@@ -65,6 +74,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve local uploads for the dashboard
+app.mount("/uploads", StaticFiles(directory=os.path.join(BASE_DIR, "uploads")), name="uploads")
 
 # Configuration
 AERIAL_CATS = ["suspicious_site"]
@@ -189,13 +201,21 @@ async def predict(
 
         community_alert = False
         if lat != "null" and lng != "null":
+            # Save the image to disk
+            timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"landfill_{timestamp_str}.png"
+            file_path = os.path.join(UPLOAD_DIR, filename)
+            image.save(file_path)
+            # Store relative path for frontend
+            rel_path = f"/uploads/reports/{filename}"
+
             if status_type == "danger" and final_score > 0.80:
                 community_alert = True
                 
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO reports (lat, lng, score, category, status, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
-                         (float(lat), float(lng), final_score, 'landfill', status, datetime.now()))
+            cursor.execute("INSERT INTO reports (lat, lng, score, category, status, image_path, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                         (float(lat), float(lng), final_score, 'landfill', status, rel_path, datetime.now()))
             
             if not community_alert:
                 cursor.execute('''SELECT COUNT(*) FROM reports 
@@ -275,10 +295,17 @@ async def analyze_deforestation(
             
         # Log to DB if geo-tagged
         if lat != "null" and lng != "null":
+            # Save the 'after' image as the primary record
+            timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"deforest_{timestamp_str}.png"
+            file_path = os.path.join(UPLOAD_DIR, filename)
+            img_after_pil.save(file_path)
+            rel_path = f"/uploads/reports/{filename}"
+
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO reports (lat, lng, score, category, status, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
-                         (float(lat), float(lng), percent_loss / 100, 'deforestation', severity, datetime.now()))
+            cursor.execute("INSERT INTO reports (lat, lng, score, category, status, image_path, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                         (float(lat), float(lng), percent_loss / 100, 'deforestation', severity, rel_path, datetime.now()))
             conn.commit()
             conn.close()
 
@@ -327,6 +354,19 @@ async def delete_report(report_id: int):
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
+        
+        # Get image path before deleting
+        cursor.execute("SELECT image_path FROM reports WHERE id = ?", (report_id,))
+        row = cursor.fetchone()
+        if row and row[0]:
+            img_rel_path = row[0]
+            # Convert /uploads/reports/filename to full path
+            # Remove leading slash if it exists for os.path.join
+            clean_rel_path = img_rel_path.lstrip('/')
+            full_img_path = os.path.join(BASE_DIR, clean_rel_path)
+            if os.path.exists(full_img_path):
+                os.remove(full_img_path)
+
         cursor.execute("DELETE FROM reports WHERE id = ?", (report_id,))
         conn.commit()
         conn.close()
